@@ -1,17 +1,13 @@
-// script.js - BUILD202509160740B (수정판)
+// script.js - BUILD202509160740B (QR 코드 완전 삭제 버전)
 document.addEventListener('DOMContentLoaded', function() {
     // DOM 요소들 가져오기
     const photoUpload = document.getElementById('photoUpload');
     const processBtn = document.getElementById('processBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const canvas = document.getElementById('cardCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true }); // 성능 경고 해결
     const gradeBadge = document.querySelector('.grade-badge');
     const scoreDisplay = document.querySelector('.score-display');
-
-    // 상태 플래그
-    let isCardGenerated = false;
-    let isQRGenerated = false;
 
     // 초기 상태: 사진 없을 때 버튼 비활성화
     processBtn.disabled = true;
@@ -28,13 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const img = new Image();
                 img.onload = function() {
                     try {
-                        // 상태 초기화
-                        isCardGenerated = false;
-                        isQRGenerated = false;
-                        processBtn.disabled = true; // 분석 전까지 비활성
-                        downloadBtn.disabled = true;
-
-                        // 캔버스 초기화
+                        // 캔버스에 이미지 그리기
                         canvas.width = 400;
                         canvas.height = 400;
                         
@@ -51,6 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         let width = img.width;
                         let height = img.height;
                         
+                        // 비율 유지하면서 크기 조정
                         if (width > height) {
                             if (width > maxWidth) {
                                 height = height * (maxWidth / width);
@@ -73,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
                         ctx.shadowBlur = 15;
                         ctx.strokeRect(20, 20, 360, 360);
-                        ctx.shadowBlur = 0;
+                        ctx.shadowBlur = 0; // 그림자 초기화
                         
                         // 4. Lucy Shot 텍스트 추가 (하단 중앙)
                         ctx.fillStyle = 'rgba(255, 107, 107, 0.8)';
@@ -89,12 +80,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             const logoX = 400 - logoWidth - 20;
                             const logoY = 20;
                             ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-                            isCardGenerated = true;
-                            processBtn.disabled = false; // 로고까지 완료되면 활성화
+                            // 로고 로드 완료 후 버튼 활성화
+                            processBtn.disabled = false;
                         };
                         logoImg.onerror = function() {
                             console.warn('로고 이미지(lucy-logo.png)를 찾을 수 없습니다.');
-                            isCardGenerated = true;
                             processBtn.disabled = false;
                         };
                         logoImg.src = 'lucy-logo.png';
@@ -119,31 +109,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 카드 만들기 버튼 - 자동 점수 분석 + QR 코드 생성
+    // 카드 만들기 버튼 - 자동 점수 분석
     processBtn.addEventListener('click', function() {
-        if (!photoUpload.files[0] || !isCardGenerated) {
+        if (!photoUpload.files[0]) {
             alert('먼저 사진을 선택해주세요!');
             return;
         }
 
         try {
+            // 캔버스에서 이미지 데이터 가져오기
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // 사진 분석 (간단한 로컬 분석)
             const analysis = analyzePhotoSimple(imageData);
             
+            // 점수와 등급 표시
             gradeBadge.textContent = analysis.grade;
             scoreDisplay.textContent = analysis.score;
-            
-            // QR 코드 생성 (이미 생성된 경우 스킵)
-            if (!isQRGenerated) {
-                generateAndDrawQRCode(analysis, () => {
-                    isQRGenerated = true;
-                    downloadBtn.disabled = false; // QR 완료 후에만 저장 활성화
-                });
-            } else {
-                downloadBtn.disabled = false;
-            }
 
-            alert(`분석 완료!\n등급: ${analysis.grade}\n점수: ${analysis.score}\n포인트: +${analysis.points} Points\nQR 코드가 생성되었습니다!`);
+            // QR 코드 관련 코드 완전히 삭제됨
+            alert(`분석 완료!\n등급: ${analysis.grade}\n점수: ${analysis.score}\n포인트: +${analysis.points} Points`);
+
+            // 분석 완료 후 저장 버튼 활성화
+            downloadBtn.disabled = false;
 
         } catch (error) {
             console.error('분석 중 오류:', error);
@@ -153,8 +141,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 저장하기 버튼
     downloadBtn.addEventListener('click', function() {
-        if (!isQRGenerated) {
-            alert('먼저 [카드 만들기] 버튼을 눌러 QR 코드를 생성해주세요!');
+        if (!photoUpload.files[0]) {
+            alert('먼저 사진을 선택하고 카드를 만들어주세요!');
             return;
         }
         
@@ -170,6 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let brightness = 0;
         let red = 0, green = 0, blue = 0;
         
+        // 픽셀 데이터 분석
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
@@ -187,20 +176,23 @@ document.addEventListener('DOMContentLoaded', function() {
         green = green / pixelCount;
         blue = blue / pixelCount;
         
+        // 간단한 점수 계산
         let score = Math.min(100, Math.max(0, 
             (brightness / 255) * 40 + 
             (red > green && red > blue ? 30 : 20) + 
-            10
+            10 // 기본 점수
         ));
         
         score = Math.round(score);
         
+        // 등급 계산
         let grade = 'D';
         if (score >= 90) grade = 'S';
         else if (score >= 80) grade = 'A';
         else if (score >= 70) grade = 'B';
         else if (score >= 60) grade = 'C';
         
+        // 포인트 계산
         const basePoints = {
             'S': 500,
             'A': 300,
@@ -226,50 +218,5 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // QR 코드 생성 및 캔버스에 그리기 (콜백 지원)
-    function generateAndDrawQRCode(analysisData, callback) {
-        const qrData = JSON.stringify({
-            id: analysisData.id,
-            timestamp: analysisData.timestamp,
-            score: analysisData.score,
-            grade: analysisData.grade,
-            points: analysisData.points
-        });
-
-        const qrCanvas = document.createElement('canvas');
-        
-        QRCode.toCanvas(qrCanvas, qrData, {
-            width: 80, // 크기 조정 (100 → 80)
-            height: 80,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#ffffff'
-            }
-        }, (error) => {
-            if (error) {
-                console.error('QR 코드 생성 오류:', error);
-                alert('QR 코드 생성 중 오류가 발생했습니다.');
-                if (callback) callback();
-                return;
-            }
-            
-            // QR 코드 위치: 좌측 하단 (점수와 겹치지 않도록)
-            const qrX = 20;
-            const qrY = 400 - 80 - 20; // 300
-            
-            // QR 영역 지우기 (덮어쓰기 방지)
-            ctx.clearRect(qrX - 5, qrY - 5, 90, 90);
-            
-            // QR 코드 그리기
-            ctx.drawImage(qrCanvas, qrX, qrY, 80, 80);
-            
-            // 테두리
-            ctx.strokeStyle = '#333333';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(qrX, qrY, 80, 80);
-            
-            if (callback) callback();
-        });
-    }
+    // QR 코드 관련 함수 완전히 삭제됨
 });
